@@ -1,5 +1,5 @@
+/* accesoDatos.js */
 function fr_GenerarAccesoDatos(){
-	console.log("Wilyyyyyyyyyyyyyyyy")
 	var myArray = [];
 	var listar = "";
 	var consultar = "";
@@ -35,6 +35,7 @@ function fr_GenerarAccesoDatos(){
 		listar = fr_ConstruirListarAD(myArray);
 	});
 	callbacks.add(function(){
+		console.log("XXXXXXXXX 11111")
 		consultar = fr_ConstruirConsultar(myArray);
 	});
 	callbacks.add(function(){
@@ -179,210 +180,171 @@ function fr_ConstruirListarAD(myArray){
 }
 
 
-
 function fr_ConstruirConsultar(myArray){
-	var procedure = "";
-	var cabecera = "";
-	var descripcion = "";
-	var campos = "";
-	var where = "   where ";
-	var colocarAnd = false;
-	var and = "";
+	var inicio = "";
+	inicio = e8+'public List<EN_'+nombreTabla+'> Consultar_'+nombreTabla+'(EN_'+nombreTabla+' oENT)\n'+
+			 e8+'{\n'+
+			 e11+'OracleDataReader dr = null;\n'+
+			 e11+'try\n'+
+			 e11+'{\n\n'+
+			 e14+'OracleCommand cmdOracle = new OracleCommand();\n'+
+			 e14+'cmdOracle.CommandType = CommandType.StoredProcedure;\n'+
+			 e14+'cmdOracle.CommandText = "'+esquema+'.'+esquema+'_K_'+nombreTabla+'.Consultar_'+nombreTabla+'";\n\n'+
+			 e14+'OracleParameter prmOracle;\n';
 
-	descripcion +=
-	"/*=====================================================================\n"+
-	"PROPOSITO: Consultar "+nombreTabla+" \n"+
-	"AUTOR: "+autor+"                                      FECHA:"+hoy()+"\n"+
-	"---------------------------------------------------------------------\n"+
-	"DATOS RELEVANTES:\n";
-
+	var parametros = "";
 	// Recorriendo el Array
 	$.each(myArray, function(index, val) {
 		
 		 var parametro = "p_"+val[1]+PrimeraMayus(val[0]);
-		 var nombre = PrimeraMayus(val[0]);
+		 var nombre = val[0].toUpperCase();
 
 
-		 if(val[3]=='N'){ // Consideramos los campos que no son de Auditoria
-		 	// Para la cabecera	 
-			 var linea1 = "   "+parametro+"    IN    "+nombreTabla.toUpperCase()+"."+nombre+"%TYPE,";
-			 console.log("Linea: "+linea1);
-			 cabecera += linea1+"\n";
-
-			 // Para la descripcion
-			 var linea2 = "  - "+parametro+" = DESCRIPCION";
-			 descripcion += linea2+"\n";		 
-
-			 // Para el Where		  
+		 if(val[3]=='N'){ // Consideramos los campos que no son de Auditoria  
 			 switch(val[1]){ // Tipo de dato c,n,d
 			 	case 'c':
-			 		console.log(nombre +" es cadena.")
-			 		if(colocarAnd) and = '     and';
-			 		where += " "+and+" (a."+nombre+" like '%'|| "+parametro+" ||'%')\n";
-			 		colocarAnd = true;
+			 		var par = e14+'prmOracle = new OracleParameter("'+parametro+'", OracleType.VarChar);\n'+
+			 				  e14+'prmOracle.Value = Formateo_Texto(oENT.'+nombre+');\n'+
+			 				  e14+'cmdOracle.Parameters.Add(prmOracle);';
+
+			 		parametros = (parametros=='')? par :parametros+'\n\n'+par;
 			 		break;
 			 	case 'n':
-			 		console.log(nombre +" es Numero.")
-			 		if(colocarAnd) and = '     and';
-			 		where += " "+and+" ("+parametro+" is null OR a."+nombre+" = "+parametro+")\n";
-			 		colocarAnd = true;
+			 		var par = e14+'prmOracle = new OracleParameter("'+parametro+'", OracleType.Number);\n'+
+			 				  e14+'prmOracle.Value = Formateo_Numero(oENT.'+nombre+');\n'+
+			 				  e14+'cmdOracle.Parameters.Add(prmOracle);';
+
+			 		parametros = (parametros=='')? par :parametros+'\n\n'+par;
 			 		break;
+			 	case 'd':
+			 		var par = e14+'prmOracle = new OracleParameter("'+parametro+'", OracleType.DateTime);\n'+
+			 				  e14+'prmOracle.Value = Formateo_Fecha(oENT.'+nombre+');\n'+
+			 				  e14+'cmdOracle.Parameters.Add(prmOracle);';
+
+			 		parametros = (parametros=='')? par :parametros+'\n\n'+par;
+			 		break;	
 			 }
 		 }	 
+	});	
+	
+	parametros += '\n\n'+
+                e14+'prmOracle = new OracleParameter("C_Cursor", OracleType.Cursor);\n'+
+                e14+'prmOracle.Direction = ParameterDirection.Output;\n'+
+                e14+'cmdOracle.Parameters.Add(prmOracle);\n\n'+
+                e14+'dr = base.GetDataReader(cmdOracle);\n\n'+
+                e14+'List<EN_RPW00006> lstEN_RPW00006 = new List<EN_RPW00006>();\n'+
+                e14+'int crrltvo = 1;\n';
+
+	
+	var campos = "";
+	campos += e14+'if (dr.HasRows) \n'+e14+'{\n'+
+              e18+'while (dr.Read())\n'+e18+'{\n'+
+              e22+'EN_'+nombreTabla+' oEN_'+nombreTabla+' = new EN_'+nombreTabla+'();\n'+
+              e22+'oEN_'+nombreTabla+'.RowNum = crrltvo;\n';
+
+     // Recuperando los campos de la BD         
+     $.each(myArray, function(index, val) {		
+		 var parametro = "p_"+val[1]+PrimeraMayus(val[0]);
+		 var nombre = val[0].toUpperCase();
+		 switch(val[1]){ // Tipo de dato c,n,d
+		 	case 'c':
+		 		campos += e22+'if (!Convert.IsDBNull(dr["'+nombre+'"])) oEN_'+nombreTabla+'.'+nombre+' = Convert.ToString(dr["'+nombre+'"]);\n';
+		 		break;
+		 	case 'n':
+		 		campos += e22+'if (!Convert.IsDBNull(dr["'+nombre+'"])) oEN_'+nombreTabla+'.'+nombre+' = Convert.ToInt32(dr["'+nombre+'"]);\n';
+		 		break;
+		 	case 'd':
+		 		campos += e22+'if (!Convert.IsDBNull(dr["'+nombre+'"])) oEN_'+nombreTabla+'.'+nombre+' = Convert.ToDateTime(dr["'+nombre+'"]);\n';
+		 		break;	
+		 }
+	});         
+
+    campos += e22 +'crrltvo++;\n'+e22+'lstEN_'+nombreTabla+'.Add(oEN_'+nombreTabla+');\n'+
+              e18+'}\n'+e18+'dr.Close();\n'+e18+'CloseOracleConnection();\n'+e14+'}\n'+
+              e14+'return lstEN_'+nombreTabla+';\n';
+
+    var fin = "";
+	fin += e11+'}\n'+e11+'catch (OracleException ex)\n'+e11+'{\n'+e14+'General.LogError(ex); throw ex;\n'+
+		   e11+'}\n'+e11+'catch (Exception ex)\n'+e11+'{\n'+e14+'General.LogError(ex); throw ex;\n'+
+		   e11+'}\n'+e8+'}\n';
 
 
-		 // Recuperando los campos
-		 campos = (campos=="")? nombre : campos += ", "+nombre;
-
-	});
-	cabecera +=
-	"   C_Cursor           OUT      SYS_REFCURSOR\n"+
-	")\nAS\nBEGIN\n";
-
-	descripcion +=
-  	"  - C_Cursor = Cursor de resultado de la Consulta.\n"+
-	"---------------------------------------------------------------------\n"+
-	"DESCRIPCION FUNCIONAL:\n"+
-  	"  -  Consultar "+nombreTabla+"\n"+
-  	"========================================================================*/\n";	
-
-	procedure = descripcion;
-	procedure += "PROCEDURE Consultar_"+nombreTabla+"(\n";
-	procedure += cabecera;
-
-
-	procedure += 
-	"   OPEN C_Cursor FOR\n"+
-    "   Select  "+campos+"\n"+
-    "   From "+esquema+"."+nombreTabla+" a\n"+
-    where + 
-    "   ORDER BY 1;\n";
-	procedure += "END  Consultar_"+nombreTabla+";";
-
-	return procedure;
+	return inicio + parametros + campos+fin;
 }
 
-
 function fr_ConstruirAddUpdate(myArray){
-	var procedure = "";
-	var cabecera = "";
-	var descripcion = "";
-	var campos = "";
-	var where = "   where ";
-	var colocarAnd = false;
-	var and = "";
-	var faltaUser = true;
-	//var parametros = "p_cAcccion, ";
+	var inicio = "";
+	inicio = e8+'public int Add_Update_'+nombreTabla+'(EN_'+nombreTabla+' oENT)\n'+
+			 e8+'{\n'+
+			 e11+'int result = 0;\n'+
+			 e11+'try\n'+
+			 e11+'{\n'+
+			 e14+'using (OracleCommand cmdOracle = new OracleCommand())\n'+
+             e14+'{\n'+
+			 e18+'cmdOracle.CommandType = CommandType.StoredProcedure;\n'+
+			 e18+'cmdOracle.CommandText = "'+esquema+'.'+esquema+'_K_'+nombreTabla+'.Add_Update_'+nombreTabla+'";\n\n'+
+			 e18+'OracleParameter prmOracle;\n';
+
 	var parametros = "";
-
-	descripcion +=
-	"/*=====================================================================\n"+
-	"PROPOSITO: Agregar o Actualizar "+nombreTabla+" \n"+
-	"AUTOR: "+autor+"                                      FECHA:"+hoy()+"\n"+
-	"---------------------------------------------------------------------\n"+
-	"DATOS RELEVANTES:\n"+
-	"  - p_cAcccion = Accion 1 agregar o 2 editar.\n";
-
-	cabecera += '   p_nAccion  IN      NUMBER,\n';
-	var setear = "";
-
 	// Recorriendo el Array
 	$.each(myArray, function(index, val) {
 		
 		 var parametro = "p_"+val[1]+PrimeraMayus(val[0]);
-		 var nombre = PrimeraMayus(val[0]);	 
-
-		 console.log("Campo: "+nombre+" = "+val[2]+" - Auditoria: - "+val[3])
+		 var nombre = val[0].toUpperCase();
 
 
-		 if(val[3]=='N'){ // Consideramos los campos que no son de Auditoria
-		 	// Para la cabecera	 
-			 cabecera += "   "+parametro+"    IN    "+nombreTabla.toUpperCase()+"."+nombre+"%TYPE,\n";
+		 if(val[3]=='N'){ // Consideramos los campos que no son de Auditoria  
+			 switch(val[1]){ // Tipo de dato c,n,d
+			 	case 'c':
+			 		var par = e18+'prmOracle = new OracleParameter("'+parametro+'", OracleType.VarChar);\n'+
+			 				  e18+'prmOracle.Value = Formateo_Texto(oENT.'+nombre+');\n'+
+			 				  e18+'cmdOracle.Parameters.Add(prmOracle);';
 
-			 parametros = (parametros=='')? parametro : parametros + ', '+parametro;
-
-			 // Para la descripcion
-			 descripcion += "  - "+parametro+" = DESCRIPCION\n";
-
-
-
-			 // Para el Where		  
-			 switch(val[2]){ // S =PK
-			 	case 'S':
-			 		if(colocarAnd) and = '     and';
-			 		where += " "+and+" a."+nombre+" = "+parametro+"\n";
-			 		colocarAnd = true;
+			 		parametros = (parametros=='')? par :parametros+'\n\n'+par;
 			 		break;
-			 	case 'N':
-			 		console.log("SETEAR: "+nombre+" = "+parametro+"\n")
-			 		setear = (setear=='')? "   SET "+nombre+" = "+parametro+"\n" : setear +"          "+nombre+" = "+parametro+"\n";
+			 	case 'n':
+			 		var par = e18+'prmOracle = new OracleParameter("'+parametro+'", OracleType.Number);\n'+
+			 				  e18+'prmOracle.Value = Formateo_Numero(oENT.'+nombre+');\n'+
+			 				  e18+'cmdOracle.Parameters.Add(prmOracle);';
+
+			 		parametros = (parametros=='')? par :parametros+'\n\n'+par;
+			 		break;
+			 	case 'd':
+			 		var par = e18+'prmOracle = new OracleParameter("'+parametro+'", OracleType.DateTime);\n'+
+			 				  e18+'prmOracle.Value = Formateo_Fecha(oENT.'+nombre+');\n'+
+			 				  e18+'cmdOracle.Parameters.Add(prmOracle);';
+
+			 		parametros = (parametros=='')? par :parametros+'\n\n'+par;
 			 		break;	
 			 }
-		 }else{
-		 	if(faltaUser && val[1] == 'c'){
-		 		cabecera +=
-				"   p_cUser    IN    "+nombreTabla.toUpperCase()+"."+nombre+"%TYPE,\n";
-		 		faltaUser = false;
-		 	}
+		 }	 
+	});	
+	
+	parametros += '\n\n'+
+				e18+'prmOracle = new OracleParameter("p_nRetorno", OracleType.Number);\n'+
+                e18+'prmOracle.Direction = System.Data.ParameterDirection.Output;\n'+
+                e18+'cmdOracle.Parameters.Add(prmOracle);\n\n'+
+                e18+'prmOracle = new OracleParameter("p_cMensaje", OracleType.VarChar, 4000);\n'+
+                e18+'prmOracle.Direction = System.Data.ParameterDirection.Output;\n'+
+                e18+'cmdOracle.Parameters.Add(prmOracle);\n\n'+
+                e18+'base.ExecuteNoneQuery(cmdOracle);\n\n';
 
-		 	if(val[1] == 'c'){parametros += ', USER';}
-		 	if(val[1] == 'd'){parametros += ', SYSDATE';}
-		 }
+	
+	var respuesta = "";
+	respuesta += e18+'if (!Convert.IsDBNull(cmdOracle.Parameters["p_nRetorno"]))\n'+
+              e18+'{\n'+
+              e22+'result = int.Parse(cmdOracle.Parameters["p_nRetorno"].Value.ToString());\n'+
+              e22+'if (result < 0)\n'+
+              e26+'throw new Exception(cmdOracle.Parameters["p_cMensaje"].Value.ToString());\n'+
+              e18+'}\n'+
+              e14+'}\n'+
+              e14+'return result;\n';
 
-
-		 // Recuperando los campos
-		 campos = (campos=="")? nombre : campos += ", "+nombre;
-
-	});
-	cabecera +=
-	"   p_nRetorno         OUT      NUMBER,\n"+
-	"   p_cMensaje         OUT      VARCHAR\n"+	
-	")\nAS\n   nCorrelativo Number;\nBEGIN\n";
-
-	descripcion +=
-  	"  - p_cUser = Usuario de creacion o actualizacion.\n"+
-  	"  - p_nRetorno = Retorno.\n"+
-  	"  - p_cMensaje = Mensaje en caso de Error.\n"+
-	"---------------------------------------------------------------------\n"+
-	"DESCRIPCION FUNCIONAL:\n"+
-  	"  -  Consultar "+nombreTabla+"\n"+
-  	"========================================================================*/\n";	
-
-	procedure = descripcion;
-	procedure += "PROCEDURE AddUpdate_"+nombreTabla+"(\n";
-	procedure += cabecera;
+    var fin = "";
+	fin += e11+'}\n'+e11+'catch (OracleException ex)\n'+e11+'{\n'+e14+'General.LogError(ex); throw ex;\n'+
+		   e11+'}\n'+e11+'catch (Exception ex)\n'+e11+'{\n'+e14+'General.LogError(ex); throw ex;\n'+
+		   e11+'}\n'+e8+'}\n';
 
 
-	procedure += 
-	"   IF p_nAccion = 1 THEN\n"+
-	"      BEGIN\n"+
-	"         SELECT nvl(max(COD_PROCESO),0) + 1\n"+
-	"              into nCorrelativo\n"+
-	"              from "+esquema.toUpperCase()+"."+nombreTabla.toUpperCase()+"\n      "+where+"         ;\n"+
-	"      EXCEPTION\n"+
-	"              WHEN NO_DATA_FOUND\n"+
-	"              THEN\n"+
-	"                nCod_Proceso := 1;\n"+
-	"              WHEN OTHERS\n"+
-	"              THEN\n"+
-	"                nCod_Proceso := 1;\n"+
-	"      END;\n"+
-	"      INSERT INTO "+esquema.toUpperCase()+"."+nombreTabla.toUpperCase()+"\n"+
-	"                ("+campos+" )\n"+
-	"      VALUES ("+parametros+");\n"+
-	"         p_nRetorno := nCod_Proceso;\n"+
-	"   ELSE\n"+
-	"      Update "+esquema.toUpperCase()+"."+nombreTabla.toUpperCase()+"\n"+
-	"   "+setear+
-    "   "+where + "      ;\n"+
-    "      p_nRetorno := 0;\n";
-	procedure += 
-	"   END IF;\n"+
-	"EXCEPTION\n"+
-    "WHEN OTHERS THEN\n"+
-    "  p_nRetorno := -1;\n"+
-    "  p_cMensaje := SQLERRM;\n"+
-	"END  AddUpdate_"+nombreTabla+";";
-
-	return procedure;
+	return inicio + parametros + respuesta+fin;
 }
